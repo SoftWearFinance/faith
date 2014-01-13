@@ -1,3 +1,11 @@
+/**
+ * @name faith
+ * @version 0.1.9
+ * @description faith — JavaScript promises library
+ * @license MIT (license.txt)
+ * @author Dmitry Makhnev, SoftWearFinance LLC
+ * © SoftWearFinance LLC (http://softwearfinance.com/), Dmitry Makhnev (https://github.com/DmitryMakhnev)
+ */
 (function(global){
     var faith,
         isArray,
