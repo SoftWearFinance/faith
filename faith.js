@@ -1,11 +1,14 @@
 /**
  * @name faith
- * @version 0.1.9
+ * @version 0.1.12
  * @description faith — JavaScript promises library
  * @license MIT (license.txt)
  * @author Dmitry Makhnev, SoftWearFinance LLC
  * © SoftWearFinance LLC (http://softwearfinance.com/), Dmitry Makhnev (https://github.com/DmitryMakhnev)
  */
+
+//todo support http://promises-aplus.github.io/promises-spec/#point-39, but why?
+
 (function(global){
     var faith,
         isArray,
@@ -21,7 +24,12 @@
         }
     }
 
-    // isNotNeedTick flag ignore http://promises-aplus.github.io/promises-spec/#point-39
+    /**
+     * Promise constructor
+     * @param {*} [value] start promise value
+     * @param {Boolean} [isNotNeedTick] flag ignore http://promises-aplus.github.io/promises-spec/#point-39
+     * @constructor
+     */
     function Promise(value, isNotNeedTick){
         var promise = this;
 
@@ -43,7 +51,13 @@
 
 
     Promise.prototype = {
-
+        /**
+         * add callback on change state
+         * @param {Function} [onFulfilled] callback on fulfill (first parameter is promise value)
+         * @param {Function} [onRejected] callback on reject (first parameter is promise value)
+         * @param {*} [ctx] context for onFulfilled and onRejected
+         * @returns {Promise}
+         */
         then: function(onFulfilled, onRejected, ctx){
             var promise = this,
                 isHasReject = (onRejected !== u);
@@ -74,6 +88,14 @@
             return promise;
         },
 
+        /**
+         * add callback on change state with data
+         * @param {Function} [onFulfilled] callback on fulfill (first parameter is promise value)
+         * @param {Function} [onRejected] callback on reject (first parameter is promise value)
+         * @param {*} [data] second parameter for onFulfilled and onRejected
+         * @param {*} [ctx] context for onFulfilled and onRejected
+         * @returns {Promise}
+         */
         thenWithData: function(onFulfilled, onRejected, data, ctx){
             var promise = this,
                 isHasReject = (onRejected !== u);
@@ -105,10 +127,34 @@
             return promise;
         },
 
+        /**
+         * add callback on done
+         * @param {Function} onDone callback on resolved (first parameter is promise value)
+         *      (add to then onFulfill and onReject stack)
+         * @param {*} [ctx] context for onDone
+         * @returns {Promise}
+         */
         done: function(onDone, ctx){
             return this.then(onDone, onDone, ctx);
         },
 
+        /**
+         * add callback on done with data
+         * @param {Function} onDone callback on resolved (first parameter is promise value)
+         *      (add to then onFulfill and onReject stack)
+         * @param {*} [data] second parameter for onDone
+         * @param {*} [ctx] context for onDone
+         * @returns {Promise}
+         */
+        doneWithData: function(onDone, data, ctx){
+            return this.thenWithData(onDone, onDone, data, ctx);
+        },
+
+        /**
+         * fulfill promise
+         * @param {*} [value] promise value
+         * @returns {Promise}
+         */
         fulfill: function(value){
             var promise = this;
             if (!promise.isResolved){
@@ -120,6 +166,11 @@
             return promise;
         },
 
+        /**
+         * fulfill promise
+         * @param {*} [error] promise error value
+         * @returns {Promise}
+         */
         reject: function(error){
             var promise = this;
             if (!promise.isResolved){
@@ -166,6 +217,12 @@
         }
     }
 
+    /**
+     * promise wrapper for some promises
+     * @param {Array|arguments} promises promises collection
+     * @param {Boolean} [isNotNeedTick] flag ignore http://promises-aplus.github.io/promises-spec/#point-39
+     * @constructor
+     */
     function Believe(promises, isNotNeedTick){
         var believe = this,
             i = 0,
@@ -215,6 +272,12 @@
         }
     }
 
+    /**
+     * promise wrapper for some promises
+     * @param {Object} promisesObject promises hash table
+     * @param {Boolean} [isNotNeedTick] flag ignore http://promises-aplus.github.io/promises-spec/#point-39
+     * @constructor
+     */
     function BelieveOfObject(promisesObject, isNotNeedTick){
         var believe = this,
             believeValue = {},
@@ -266,11 +329,27 @@
 
 
     BelieveOfObject.prototype = Believe.prototype = {
+        /**
+         * add callback on change state
+         * @param {Function} [onFulfilled] callback on fulfill (first parameter is promise value)
+         * @param {Function} [onRejected] callback on reject (first parameter is promise value)
+         * @param {*} [ctx] context for onFulfilled and onRejected
+         * @returns {Promise}
+         */
         then: function(onFulfilled, onRejected, ctx){
             var believe = this;
             believe._promise.then(onFulfilled, onRejected, ctx || believe);
             return believe;
         },
+
+        /**
+         * add callback on change state with data
+         * @param {Function} [onFulfilled] callback on fulfill (first parameter is promise value)
+         * @param {Function} [onRejected] callback on reject (first parameter is promise value)
+         * @param {*} [data] second parameter for onFulfilled and onRejected
+         * @param {*} [ctx] context for onFulfilled and onRejected
+         * @returns {Promise}
+         */
         thenWithData: function(onFulfilled, onRejected, data, ctx){
             var believe = this;
             if ((onRejected !== u) && (typeof onRejected !== 'function')){
@@ -281,11 +360,34 @@
             believe._promise.thenWithData(onFulfilled, onRejected, data, ctx || believe);
             return believe;
         },
+
+        /**
+         * add callback on done
+         * @param {Function} onDone callback on resolved (first parameter is promise value)
+         *      (add to then onFulfill and onReject stack)
+         * @param {*} [ctx] context for onDone
+         * @returns {Promise}
+         */
         done: function(onDone, ctx){
             var believe = this;
             believe._promise.done(onDone, ctx || believe);
             return believe;
         },
+
+        /**
+         * add callback on done with data
+         * @param {Function} onDone callback on resolved (first parameter is promise value)
+         *      (add to then onFulfill and onReject stack)
+         * @param {*} [data] second parameter for onDone
+         * @param {*} [ctx] context for onDone
+         * @returns {Promise}
+         */
+        doneWithData: function(onDone, data, ctx){
+            var believe = this;
+            believe._promise.doneWithData(onDone, data, ctx || believe);
+            return believe;
+        },
+
         destructor: function(){
 //            todo
         }
@@ -296,7 +398,7 @@
 
         /**
          * create promise
-         * @param {Mixed} value — promise value
+         * @param {*} [value] promise value
          * @returns {Promise}
          */
         promise: function(value){
@@ -305,7 +407,7 @@
 
         /**
          * create promise without tick
-         * @param {Mixed} value — promise value
+         * @param {*} [value] promise value
          * @returns {Promise}
          */
         promiseNT: function(value){
@@ -314,7 +416,7 @@
 
         /**
          * test verifiable on promise
-         * @param {Mixed} verifiable
+         * @param {*} verifiable
          * @returns {boolean} isPromise
          */
         isPromise: function(verifiable){
@@ -323,6 +425,7 @@
 
         /**
          * create believe
+         * believe is promise wrapper for some promises
          * @param {promise|Object|Array} promise
          * @returns {Believe}
          */
@@ -337,6 +440,7 @@
 
         /**
          * create believe without tick
+         * believe is promise wrapper for some promises
          * @param {promise|Object|Array} promise
          * @returns {Believe}
          */
@@ -351,7 +455,7 @@
 
         /**
          * test verifiable on believe
-         * @param {Mixed} verifiable
+         * @param {*} verifiable
          * @returns {boolean} isBelieve
          */
         isBelieve: function(verifiable){
@@ -361,7 +465,7 @@
 
         /**
          * test verifiable on promise or believe
-         * @param {Mixed} verifiable
+         * @param {*} verifiable
          * @returns {boolean} isPromiseOrBelieve
          */
         isThenable: function(verifiable){
