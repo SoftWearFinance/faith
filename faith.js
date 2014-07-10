@@ -14,13 +14,13 @@
         isArray,
         u;
 
-    if (Array.isArray !== u){
+    if (global.Array.isArray !== u){
         isArray = function(object){
-            return Array.isArray(object);
+            return global.Array.isArray(object);
         }
     } else{
         isArray = function(object){
-            return Object.prototype.toString.call(object) === '[object Array]';
+            return global.Object.prototype.toString.call(object) === '[object Array]';
         }
     }
 
@@ -42,11 +42,12 @@
         promise.isRejected = false;
         promise.isResolved = false;
 
-        // packing flat groups |isThenCallback, cb, ctx|, |isNotThenCallback, cb, data, ctx|
-        promise._onFullfill = [];
-        // packing flat groups |isThenCallback, cb, ctx|, |isNotThenCallback, cb, data, ctx|
+        // packing flat groups |isThenCallback (0), cb, ctx|, |isNotThenCallback (1), cb, data, ctx|, | isEmptyGroup (2)|
+        promise._onFulfill = [];
+        // packing flat groups |isThenCallback (0), cb, ctx|, |isNotThenCallback (1), cb, data, ctx|, | isEmptyGroup (2)|
         promise._onReject = [];
 
+        promise._nextPromise = null;
     }
 
 
@@ -67,21 +68,32 @@
                 isHasReject = false;
             }
 
+            if (promise.isResolved &&
+                (promise._nextPromise !== null)){
+                promise = promise._nextPromise;
+                promise.then(onFulfilled, onRejected, ctx);
+                return promise;
+            }
+
             //work with fulfill
-            if (!promise.isRejected && (onFulfilled !== u)){
+            if (!promise.isRejected){
                 if (promise.isResolved){
                     callThenCallback(promise, onFulfilled, ctx);
+                } else if (onFulfilled !== u){
+                    promise._onFulfill.push(0, onFulfilled, ctx);
                 } else{
-                    promise._onFullfill.push(true, onFulfilled, ctx);
+                    promise._onFulfill.push(2);
                 }
             }
 
             //work with reject
-            if (!promise.isFulfilled && isHasReject){
+            if (!promise.isFulfilled){
                 if (promise.isResolved){
                     callThenCallback(promise, onRejected, ctx);
+                } else if (isHasReject){
+                    promise._onReject.push(0, onRejected, ctx);
                 } else{
-                    promise._onReject.push(true, onRejected, ctx);
+                    promise._onReject.push(2);
                 }
             }
 
@@ -106,12 +118,21 @@
                 isHasReject = false;
             }
 
+            if (promise.isResolved &&
+                (promise._nextPromise !== null)){
+                promise = promise._nextPromise;
+                promise.thenWithData(onFulfilled, onRejected, data, ctx);
+                return promise;
+            }
+
             //work with fulfill
-            if (!promise.isRejected && (onFulfilled !== u)){
+            if (!promise.isRejected){
                 if (promise.isResolved){
                     callThenWithDataCallback(promise, onFulfilled, data, ctx);
+                } else if (onFulfilled !== u){
+                    promise._onFulfill.push(1, onFulfilled, data, ctx);
                 } else{
-                    promise._onFullfill.push(false, onFulfilled, data, ctx);
+                    promise._onFulfill.push(2);
                 }
             }
 
@@ -119,8 +140,10 @@
             if (!promise.isFulfilled && isHasReject){
                 if (promise.isResolved){
                     callThenWithDataCallback(promise, onRejected, data, ctx);
+                } else if (isHasReject){
+                    promise._onReject.push(1, onRejected, data, ctx);
                 } else{
-                    promise._onReject.push(false, onRejected, data, ctx);
+                    promise._onReject.push(2);
                 }
             }
 
@@ -160,8 +183,8 @@
             if (!promise.isResolved){
                 promise.value = value || promise.value;
                 promise.isResolved = promise.isFulfilled = true;
-                callCallbacks(promise, promise._onFullfill);
-                promise._onFullfill = promise._onReject = u;
+                callCallbacks(promise, promise._onFulfill);
+                promise._onFulfill = promise._onReject = u;
             }
             return promise;
         },
@@ -177,7 +200,7 @@
                 promise.value = error || promise.value;
                 promise.isResolved = promise.isRejected = true;
                 callCallbacks(promise, promise._onReject);
-                promise._onFullfill = promise._onReject = u;
+                promise._onFulfill = promise._onReject = u;
             }
             return promise;
         },
@@ -192,29 +215,116 @@
         // todo 2.2.4 http://promises-aplus.github.io/promises-spec/#point-39
         if (promise.isNotNeedTick){
         }
-        callback.call(ctx || promise, promise.value);
+        return callback.call(ctx || promise, promise.value);
     }
     
     function callThenWithDataCallback(promise, callback, data, ctx){
         // todo 2.2.4 http://promises-aplus.github.io/promises-spec/#point-39
         if (promise.isNotNeedTick){
         }
-        callback.call(ctx || promise, promise.value, data);
+        return callback.call(ctx || promise, promise.value, data);
     }
 
     function callCallbacks(promise, callbacksData){
         var i = 0,
-            iMax = callbacksData.length;
+            iMax = callbacksData.length,
+            result,
+            group = 1;
 
         while (i < iMax){
-            if (callbacksData[i]){
-                callThenCallback(promise, callbacksData[i + 1], callbacksData[i + 2]);
-                i += 3;
-            } else{
-                callThenWithDataCallback(promise, callbacksData[i + 1], callbacksData[i + 2], callbacksData[i + 3]);
-                i += 4;
+            switch (callbacksData[i]){
+                case 0:
+                    result = callThenCallback(promise, callbacksData[i + 1], callbacksData[i + 2]);
+                    i += 3;
+                    break;
+                case 1:
+                    result = callThenWithDataCallback(promise, callbacksData[i + 1], callbacksData[i + 2], callbacksData[i + 3]);
+                    i += 4;
+                    break;
+                case 2:
+                    i += 1;
+                    break;
+            }
+            group += 1;
+            if (faith.isPromise(result)){
+                promise._nextPromise = result;
+                if (i !== iMax){
+                    moveCallbacksToNewPromise(promise, result, group)
+                }
+                break;
             }
         }
+    }
+
+    function moveCallbacksToNewPromise(promiseFrom, promiseTo, group){
+        var onFulfillCollection = promiseFrom._onFulfill,
+            onRejectCollection = promiseFrom._onReject,
+            onFulfill,
+            onReject,
+            ctx,
+            data,
+            currentGroup = 1,
+            i = 0,
+            j = 0,
+            iMax = onFulfillCollection.length,
+            isFulfillEmpty = false,
+            isWithData = false;
+        while (i < iMax){
+            isFulfillEmpty = false;
+            isWithData = false;
+            switch (onFulfillCollection[i]){
+                case 0:
+                    onFulfill = onFulfillCollection[i + 1];
+                    ctx = onFulfillCollection[i + 2];
+                    i += 3;
+                    isFulfillEmpty = false;
+                    isWithData = false;
+                    break;
+                case 1:
+                    onFulfill = onFulfillCollection[i + 1];
+                    data = onFulfillCollection[i + 2];
+                    ctx = onFulfillCollection[i + 3];
+                    i += 4;
+                    isFulfillEmpty = false;
+                    isWithData = true;
+                    break;
+                case 2:
+                    i += 1;
+                    isFulfillEmpty = true;
+                    break;
+            }
+            switch (onRejectCollection[j]){
+                case 0:
+                    onReject = onRejectCollection[j + 1];
+                    if (isFulfillEmpty){
+                        ctx = onRejectCollection[j + 2];
+                    }
+                    j += 3;
+                    isWithData = false;
+                    break;
+                case 1:
+                    onReject = onRejectCollection[j + 1];
+                    if (isFulfillEmpty){
+                        ctx = onRejectCollection[j + 2];
+                        data = onRejectCollection[j + 3];
+                    }
+                    j += 4;
+                    isWithData = true;
+                    break;
+                case 2:
+                    j += 1;
+                    break;
+            }
+            if (currentGroup >= group){
+                if (isWithData){
+                    promiseTo.thenWithData(onFulfill, onReject, data, ctx);
+                } else{
+                    promiseTo.then(onFulfill, onReject, ctx);
+                }
+            }
+            currentGroup += 1;
+        }
+            
     }
 
     /**
