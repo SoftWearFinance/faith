@@ -78,7 +78,9 @@
             //work with fulfill
             if (!promise.isRejected){
                 if (promise.isResolved){
-                    callThenCallback(promise, onFulfilled, ctx);
+                    if (onFulfilled !== u){
+                        callThenCallback(promise, onFulfilled, ctx);
+                    }
                 } else if (onFulfilled !== u){
                     promise._onFulfill.push(0, onFulfilled, ctx);
                 } else{
@@ -89,13 +91,16 @@
             //work with reject
             if (!promise.isFulfilled){
                 if (promise.isResolved){
-                    callThenCallback(promise, onRejected, ctx);
+                    if (isHasReject){
+                        callThenCallback(promise, onRejected, ctx);
+                    }
                 } else if (isHasReject){
                     promise._onReject.push(0, onRejected, ctx);
                 } else{
                     promise._onReject.push(2);
                 }
             }
+
 
             return promise;
         },
@@ -128,7 +133,9 @@
             //work with fulfill
             if (!promise.isRejected){
                 if (promise.isResolved){
-                    callThenWithDataCallback(promise, onFulfilled, data, ctx);
+                    if (onFulfilled !== u){
+                        callThenWithDataCallback(promise, onFulfilled, data, ctx);
+                    }
                 } else if (onFulfilled !== u){
                     promise._onFulfill.push(1, onFulfilled, data, ctx);
                 } else{
@@ -139,7 +146,9 @@
             //work with reject
             if (!promise.isFulfilled && isHasReject){
                 if (promise.isResolved){
-                    callThenWithDataCallback(promise, onRejected, data, ctx);
+                    if (isHasReject){
+                        callThenWithDataCallback(promise, onRejected, data, ctx);
+                    }
                 } else if (isHasReject){
                     promise._onReject.push(1, onRejected, data, ctx);
                 } else{
@@ -317,8 +326,10 @@
             }
             if (currentGroup >= group){
                 if (isWithData){
+                    console.log(onFulfill, onReject, data, ctx);
                     promiseTo.thenWithData(onFulfill, onReject, data, ctx);
                 } else{
+                    console.log(onFulfill, onReject, ctx);
                     promiseTo.then(onFulfill, onReject, ctx);
                 }
             }
