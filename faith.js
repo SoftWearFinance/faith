@@ -265,9 +265,12 @@
     }
 
     function believeResolve(believe){
+        believe.isResolved = true;
         if (believe._hasRejected){
+            believe.isRejected = true;
             believe._promise.reject(believe.value);
         } else{
+            believe.isFulfilled = true;
             believe._promise.fulfill();
         }
     }
